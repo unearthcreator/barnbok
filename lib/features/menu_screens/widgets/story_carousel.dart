@@ -1,7 +1,7 @@
 // lib/features/menu_screens/widgets/story_carousel.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart'; // Needed for PointerDeviceKind
+import 'package:flutter/gestures.dart';
 
 class StoryCarousel extends StatefulWidget {
   const StoryCarousel({super.key});
@@ -20,11 +20,27 @@ class _StoryCarouselState extends State<StoryCarousel> {
   ];
 
   late PageController _pageController;
+  Orientation? _lastOrientation;
 
   @override
-  void initState() {
-    super.initState();
-    _pageController = PageController(viewportFraction: 0.8);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final orientation = MediaQuery.of(context).orientation;
+
+    if (_lastOrientation != orientation) {
+      _lastOrientation = orientation;
+
+      final viewportFraction = orientation == Orientation.landscape ? 0.35 : 0.55;
+      final initialPage = (_stories.length / 2).floor();
+
+      _pageController = PageController(
+        viewportFraction: viewportFraction,
+        initialPage: initialPage,
+      );
+
+      setState(() {}); // rebuild with new controller
+    }
   }
 
   @override
@@ -64,15 +80,16 @@ class _StoryCarouselState extends State<StoryCarousel> {
           value = index - (_pageController.page ?? 0);
           value = (1 - (value.abs() * 0.3)).clamp(0.8, 1.0);
         } else {
-          value = index == 0 ? 1.0 : 0.8;
+          value = index == _pageController.initialPage ? 1.0 : 0.8;
         }
+
+        double cardHeight = 250;
+        double cardWidth = cardHeight * 0.6;
 
         return Center(
           child: SizedBox(
-            height: Curves.easeOut.transform(value) * 250,
-            width: Curves.easeOut.transform(value) *
-                MediaQuery.of(context).size.width *
-                0.75,
+            height: Curves.easeOut.transform(value) * cardHeight,
+            width: Curves.easeOut.transform(value) * cardWidth,
             child: child,
           ),
         );

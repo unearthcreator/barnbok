@@ -14,7 +14,6 @@ class StorySelectorScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select a Story'),
       ),
       // --- MODIFIED BODY ---
       // Replace the simple Text widget with the StoryCarousel
