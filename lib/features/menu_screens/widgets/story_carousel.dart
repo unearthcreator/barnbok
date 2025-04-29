@@ -40,7 +40,7 @@ class _StoryCarouselState extends State<StoryCarousel> {
   // Helper function remains the same
   double _calculateViewportFraction(Orientation orientation) {
     if (kIsWeb) {
-      return 0.25; // Adjust as needed for web
+      return 0.15; // Adjust as needed for web
     } else {
       return orientation == Orientation.landscape ? 0.35 : 0.55;
     }
