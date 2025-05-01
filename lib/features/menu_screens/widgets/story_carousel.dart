@@ -10,7 +10,6 @@ import 'package:barnbok/models/card_info.dart';
 import 'package:barnbok/repositories/card_data_repository.dart';
 import 'package:barnbok/repositories/hive_card_data_repository.dart';
 
-
 class StoryCarousel extends StatefulWidget {
   const StoryCarousel({super.key});
 
@@ -32,12 +31,14 @@ class _StoryCarouselState extends State<StoryCarousel> {
   Orientation? _lastOrientation;
   double _currentViewportFraction = 0.55;
 
-  // --- Repository Handling ---
-  // Use a Future to track repository initialization
-  Future<void>? _initRepoFuture;
-  // Repository instance, initialized by the Future
+  // --- Repository and Data Handling ---
+  Future<void>? _initFuture; // Combined future for repo and initial data load
   late final CardDataRepository _repository;
-  // --- End Repository Handling ---
+  // State variable to hold the loaded card data
+  List<CardInfo> _savedCards = [];
+  bool _isLoading = true; // Track loading state
+  bool _hasError = false; // Track error state
+  // --- End Data Handling ---
 
   @override
   void initState() {
@@ -47,32 +48,60 @@ class _StoryCarouselState extends State<StoryCarousel> {
       initialPage: (_stories.length / 2).floor(),
     );
 
-    // Start the asynchronous repository initialization
-    _initRepoFuture = _initializeRepository();
+    // Start the asynchronous initialization and data loading
+    _initFuture = _initializeAndLoadData();
   }
 
-  // --- Asynchronous function to initialize the repository ---
-  Future<void> _initializeRepository() async {
+  // --- Combined initialization and data loading function ---
+  Future<void> _initializeAndLoadData() async {
+    setState(() { // Set loading state
+      _isLoading = true;
+      _hasError = false;
+    });
     try {
-       // Ensure the box is open before accessing it
-       // Note: Hive.isBoxOpen check might be useful but openBox is idempotent
+       // 1. Initialize Repository
        if (!Hive.isBoxOpen(HiveCardDataRepository.boxName)) {
           print("StoryCarousel: Warning - Box was not open. Attempting to open again.");
-          // This shouldn't ideally happen if main.dart awaits openBox,
-          // but as a safeguard:
           await Hive.openBox<CardInfo>(HiveCardDataRepository.boxName);
        }
        final cardInfoBox = Hive.box<CardInfo>(HiveCardDataRepository.boxName);
-       // Assign the real repository instance
        _repository = HiveCardDataRepository(cardInfoBox);
        print("StoryCarousel: Repository initialized successfully.");
+
+       // 2. Load Initial Card Data
+       await _loadInitialCardData();
+
+       // 3. Update state: loading finished, no error
+       if (mounted) { // Check if widget is still in the tree
+         setState(() {
+           _isLoading = false;
+           _hasError = false;
+         });
+       }
+
     } catch (e, stackTrace) {
-       print("StoryCarousel: FATAL Error initializing repository: $e\n$stackTrace");
-       // Re-throw the error to be caught by the FutureBuilder
-       rethrow;
+       print("StoryCarousel: FATAL Error initializing/loading data: $e\n$stackTrace");
+       if (mounted) {
+         setState(() {
+           _isLoading = false;
+           _hasError = true; // Set error state
+         });
+       }
+       // Optionally rethrow if needed elsewhere, but FutureBuilder handles it
+       // rethrow;
     }
   }
   // --- End Initialization Function ---
+
+  // --- Function to load card data from repository ---
+  Future<void> _loadInitialCardData() async {
+    print("StoryCarousel: Loading initial card data...");
+    _savedCards = await _repository.getAllCardsSortedByPosition();
+    print("StoryCarousel: Loaded ${_savedCards.length} cards.");
+    // No need for setState here, it's called in _initializeAndLoadData
+  }
+  // --- End Load Data Function ---
+
 
   double _calculateViewportFraction(Orientation orientation) {
     if (kIsWeb) {
@@ -110,7 +139,6 @@ class _StoryCarouselState extends State<StoryCarousel> {
         }
       });
 
-      // Trigger rebuild if needed (FutureBuilder will handle repo state)
       setState(() {});
     }
   }
@@ -118,29 +146,28 @@ class _StoryCarouselState extends State<StoryCarousel> {
   @override
   void dispose() {
     _pageController.dispose();
-    // Note: We don't typically close the Hive box here,
-    // as it's usually managed globally for the app's lifetime.
     super.dispose();
   }
 
   // --- Function to handle card taps ---
-  // Now assumes _repository is initialized because it's only called
-  // after the FutureBuilder completes successfully.
   Future<void> _onCardTap(int index) async {
+    // Ensure repository is initialized before proceeding
+    if (_isLoading || _hasError) {
+      print("StoryCarousel: Cannot handle tap, repository not ready or error occurred.");
+      return;
+    }
+
     print('Card tapped at index: $index');
-
     try {
-      print('Checking for existing card data at position $index...');
-      final List<CardInfo> allCards = await _repository.getAllCardsSortedByPosition();
-
-      final CardInfo? existingCard = allCards.firstWhereOrNull(
+      // Find existing card directly from the loaded state
+      final CardInfo? existingCard = _savedCards.firstWhereOrNull(
         (card) => card.positionIndex == index
       );
 
       if (existingCard != null) {
         // Card data FOUND
         print('Card data already exists for index $index!');
-        print('Existing Card Info: $existingCard'); // Log existing info
+        print('Existing Card Info: $existingCard');
         // TODO: Navigate to the timeline or show details for this card
       } else {
         // Card data NOT FOUND
@@ -159,10 +186,20 @@ class _StoryCarouselState extends State<StoryCarousel> {
 
         print('Saving new card data: $newCardData');
         await _repository.saveCardInfo(newCardData);
-
         print('Successfully saved new card data for index $index with ID $uniqueId!');
+
+        // --- Update local state to reflect the new save ---
+        if (mounted) {
+          setState(() {
+            _savedCards.add(newCardData);
+            // Re-sort if necessary, though adding at the end might be fine if positions are unique
+            _savedCards.sort((a, b) => a.positionIndex.compareTo(b.positionIndex));
+            print("StoryCarousel: Updated local state with new card.");
+          });
+        }
+        // --- End state update ---
+
         // TODO: Navigate to a screen to edit the new card's details
-        // TODO: Consider refreshing the UI to show the new card's image/data
       }
     } catch (e, stackTrace) {
       print('Error handling card tap for index $index: $e\n$stackTrace');
@@ -174,28 +211,26 @@ class _StoryCarouselState extends State<StoryCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    // Use FutureBuilder to wait for repository initialization
+    // Use FutureBuilder to wait for initialization and initial data load
     return FutureBuilder(
-      future: _initRepoFuture, // The future we defined in initState
+      future: _initFuture,
       builder: (context, snapshot) {
-        // Check connection state
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          // Show a loading indicator while waiting
+        // Show loading or error states
+        if (_isLoading || snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          // Show an error message if initialization failed
-          print("FutureBuilder Error: Failed to initialize repository: ${snapshot.error}");
-          return Center(
+        } else if (_hasError || snapshot.hasError) {
+           print("FutureBuilder Error: Failed to initialize/load data: ${snapshot.error}");
+           return Center(
              child: Text(
                 'Error initializing storage.\nPlease restart the app.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.red[700]),
              ),
-          );
+           );
         } else {
-          // --- Repository is ready, build the actual carousel ---
+          // --- Data is ready, build the actual carousel ---
           return SizedBox(
-            height: 250.0,
+            height: 280.0, // Increased height slightly to accommodate indicator box
             child: ScrollConfiguration(
               behavior: ScrollConfiguration.of(context).copyWith(
                 dragDevices: {
@@ -207,11 +242,20 @@ class _StoryCarouselState extends State<StoryCarousel> {
                 controller: _pageController,
                 itemCount: _stories.length,
                 itemBuilder: (context, index) {
-                  // TODO: Fetch actual image path based on saved data
-                  // This part still needs updating to show saved images,
-                  // potentially using another FutureBuilder inside here
-                  // or a different state management approach.
-                  return _buildStoryItemContent(_defaultImagePath, index);
+                  // Find the corresponding saved card from the loaded state
+                  final CardInfo? cardInfo = _savedCards.firstWhereOrNull(
+                    (card) => card.positionIndex == index
+                  );
+
+                  // Determine image path: use saved path if available, else default
+                  final String imagePathToShow = cardInfo?.imagePath ?? _defaultImagePath;
+
+                  // Pass the found cardInfo (or null) and image path down
+                  return _buildStoryItemContent(
+                     imagePathToShow,
+                     index,
+                     cardInfo, // Pass the CardInfo object itself
+                  );
                 },
               ),
             ),
@@ -222,56 +266,86 @@ class _StoryCarouselState extends State<StoryCarousel> {
     );
   }
 
-  // _buildStoryItemContent remains largely the same, but the GestureDetector
-  // is now only active when the FutureBuilder has completed successfully.
-  Widget _buildStoryItemContent(String imageAssetPath, int index) {
-    return AnimatedBuilder(
-      animation: _pageController,
-      builder: (context, child) {
-        // Animation logic remains the same
-        double value = 0.0;
-        if (_pageController.hasClients && _pageController.position.hasContentDimensions) {
-          value = index - (_pageController.page ?? _pageController.initialPage.toDouble());
-          value = (1 - (value.abs() * 0.3)).clamp(0.8, 1.0);
-        } else {
-          value = index == _pageController.initialPage ? 1.0 : 0.8;
-        }
-        double cardHeight = 250;
-        double cardWidth = cardHeight * 0.6;
+  // --- Updated to accept CardInfo and build indicator ---
+  Widget _buildStoryItemContent(String imageAssetPath, int index, CardInfo? cardInfo) {
+    return Column( // Wrap content in a Column
+      mainAxisSize: MainAxisSize.min, // Take minimum vertical space needed
+      children: [
+        // --- Existing Animated Card Structure ---
+        AnimatedBuilder(
+          animation: _pageController,
+          builder: (context, child) {
+            double value = 0.0;
+            if (_pageController.hasClients && _pageController.position.hasContentDimensions) {
+              value = index - (_pageController.page ?? _pageController.initialPage.toDouble());
+              value = (1 - (value.abs() * 0.3)).clamp(0.8, 1.0);
+            } else {
+              value = index == _pageController.initialPage ? 1.0 : 0.8;
+            }
+            double cardHeight = 250;
+            double cardWidth = cardHeight * 0.6;
 
-        return Center(
-          child: SizedBox(
-            height: Curves.easeOut.transform(value) * cardHeight,
-            width: Curves.easeOut.transform(value) * cardWidth,
-            child: GestureDetector( // GestureDetector is here
-              onTap: () => _onCardTap(index), // This is now safe to call
-              child: child,
+            return Center(
+              child: SizedBox(
+                height: Curves.easeOut.transform(value) * cardHeight,
+                width: Curves.easeOut.transform(value) * cardWidth,
+                child: GestureDetector(
+                  onTap: () => _onCardTap(index),
+                  child: child,
+                ),
+              ),
+            );
+          },
+          child: Card(
+            margin: EdgeInsets.symmetric(
+                horizontal: kIsWeb ? 8.0 : 10.0,
+                vertical: 10.0
+            ),
+            elevation: 4.0,
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset(
+              imageAssetPath, // Use the determined image path
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                 print("Error loading image: $imageAssetPath, Error: $error");
+                 // Use default image if saved one fails? Or a generic placeholder?
+                 return Image.asset( // Fallback to default image on error
+                    _defaultImagePath,
+                    fit: BoxFit.cover,
+                    errorBuilder: (ctx, err, st) => Container( // Final fallback
+                       color: Colors.grey[300],
+                       child: Center(child: Icon(Icons.broken_image, color: Colors.grey[600]))
+                    ),
+                 );
+              },
             ),
           ),
-        );
-      },
-      child: Card( // Card definition remains the same
-        margin: EdgeInsets.symmetric(
-            horizontal: kIsWeb ? 8.0 : 10.0,
-            vertical: 10.0
         ),
-        elevation: 4.0,
-        clipBehavior: Clip.antiAlias,
-        child: Image.asset(
-          imageAssetPath,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-             print("Error loading image: $imageAssetPath, Error: $error");
-             return Container(
-                color: Colors.grey[300],
-                child: Center(child: Icon(Icons.broken_image, color: Colors.grey[600]))
-             );
-          },
-        ),
-      ),
+        // --- End Existing Card Structure ---
+
+        // --- Conditional Indicator Box ---
+        if (cardInfo != null) ...[ // Use spread operator for conditional element
+          const SizedBox(height: 4), // Add small space
+          Container(
+            // Match the approximate width dynamically? This is tricky with PageView scaling.
+            // For simplicity, use a fixed width or derive from viewportFraction.
+            // Let's use a fixed width slightly less than the base card width.
+            width: (250 * 0.6) * 0.9, // Approx 90% of base card width
+            height: 10, // Approx 0.5cm might be around 10-15 logical pixels
+            decoration: BoxDecoration(
+              color: Colors.blueGrey[200], // Example color
+              borderRadius: BorderRadius.circular(4), // Rounded corners
+            ),
+            // Later, you can add the surname Text widget inside this container
+            // child: Center(child: Text(cardInfo.surname, style: TextStyle(fontSize: 8))),
+          ),
+        ] else ...[
+          // If no cardInfo, add space equivalent to the indicator's height + spacing
+          // to prevent layout jumps when cards are saved/deleted.
+          const SizedBox(height: 14), // 10 (indicator height) + 4 (spacing)
+        ],
+        // --- End Conditional Indicator Box ---
+      ],
     );
   }
 }
-
-// Dummy Repository is no longer needed as the FutureBuilder handles initialization errors
-// class DummyCardDataRepository implements CardDataRepository { ... }
