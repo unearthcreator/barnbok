@@ -102,7 +102,6 @@ class _StorySelectorScreenState extends State<StorySelectorScreen> {
     // The UI structure remains the same
     return Scaffold(
       appBar: AppBar(
-         title: const Text("Select Story Card"), // Added a title
          actions: [
            // Add a temporary clear button to the AppBar for easy access
            IconButton(
