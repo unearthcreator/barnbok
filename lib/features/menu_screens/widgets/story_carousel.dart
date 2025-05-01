@@ -229,8 +229,9 @@ class _StoryCarouselState extends State<StoryCarousel> {
            );
         } else {
           // --- Data is ready, build the actual carousel ---
+          // Increased height to accommodate potentially taller indicator box + spacing
           return SizedBox(
-            height: 280.0, // Increased height slightly to accommodate indicator box
+            height: 290.0, // Increased height: 250 (card) + 4 (space) + 20 (indicator) + ~16 (extra padding)
             child: ScrollConfiguration(
               behavior: ScrollConfiguration.of(context).copyWith(
                 dragDevices: {
@@ -268,6 +269,9 @@ class _StoryCarouselState extends State<StoryCarousel> {
 
   // --- Updated to accept CardInfo and build indicator ---
   Widget _buildStoryItemContent(String imageAssetPath, int index, CardInfo? cardInfo) {
+    // Calculate base card width for indicator sizing
+    double baseCardWidth = 250 * 0.6;
+
     return Column( // Wrap content in a Column
       mainAxisSize: MainAxisSize.min, // Take minimum vertical space needed
       children: [
@@ -283,12 +287,13 @@ class _StoryCarouselState extends State<StoryCarousel> {
               value = index == _pageController.initialPage ? 1.0 : 0.8;
             }
             double cardHeight = 250;
-            double cardWidth = cardHeight * 0.6;
+            // Use the same value transformation for width to keep aspect ratio during animation
+            double animatedCardWidth = Curves.easeOut.transform(value) * baseCardWidth;
 
             return Center(
               child: SizedBox(
                 height: Curves.easeOut.transform(value) * cardHeight,
-                width: Curves.easeOut.transform(value) * cardWidth,
+                width: animatedCardWidth, // Use animated width
                 child: GestureDetector(
                   onTap: () => _onCardTap(index),
                   child: child,
@@ -327,22 +332,20 @@ class _StoryCarouselState extends State<StoryCarousel> {
         if (cardInfo != null) ...[ // Use spread operator for conditional element
           const SizedBox(height: 4), // Add small space
           Container(
-            // Match the approximate width dynamically? This is tricky with PageView scaling.
-            // For simplicity, use a fixed width or derive from viewportFraction.
-            // Let's use a fixed width slightly less than the base card width.
-            width: (250 * 0.6) * 0.9, // Approx 90% of base card width
-            height: 10, // Approx 0.5cm might be around 10-15 logical pixels
+            // Use the base card width for the indicator width
+            width: baseCardWidth * 0.9, // Approx 90% of base card width
+            height: 20, // << INCREASED HEIGHT (was 10)
             decoration: BoxDecoration(
-              color: Colors.blueGrey[200], // Example color
+              color: Colors.grey[200], // << CHANGED COLOR (was blueGrey[200])
               borderRadius: BorderRadius.circular(4), // Rounded corners
             ),
             // Later, you can add the surname Text widget inside this container
             // child: Center(child: Text(cardInfo.surname, style: TextStyle(fontSize: 8))),
           ),
         ] else ...[
-          // If no cardInfo, add space equivalent to the indicator's height + spacing
+          // If no cardInfo, add space equivalent to the NEW indicator's height + spacing
           // to prevent layout jumps when cards are saved/deleted.
-          const SizedBox(height: 14), // 10 (indicator height) + 4 (spacing)
+          const SizedBox(height: 24), // << UPDATED HEIGHT (20 indicator + 4 spacing)
         ],
         // --- End Conditional Indicator Box ---
       ],
