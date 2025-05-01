@@ -10,37 +10,38 @@ class StoryCarousel extends StatefulWidget {
 }
 
 class _StoryCarouselState extends State<StoryCarousel> {
+  // This list still determines the *number* of cards (itemCount)
+  // The actual string content isn't used for display anymore in this version.
   final List<String> _stories = [
-    'Story 1: The Brave Knight',
-    'Story 2: The Lost Astronaut',
-    'Story 3: The Magical Forest',
-    'Story 4: The Clever Fox',
-    'Story 5: The Flying Pig',
+    'Item 1', // Content doesn't matter if showing the same image
+    'Item 2',
+    'Item 3',
+    'Item 4',
+    'Item 5',
+    'Item 6',
+    'Item 7',
   ];
+
+  // --- The image path we want to display ---
+  final String _imagePath = 'assets/images/baby_foot_ceramic.jpg';
+
 
   late PageController _pageController;
   Orientation? _lastOrientation;
-  // Initialize with a sensible default, will be corrected in didChangeDependencies
   double _currentViewportFraction = 0.55;
 
   @override
   void initState() {
     super.initState();
-    // --- CORRECTED initState ---
-    // Initialize controller with default values ONLY.
-    // DO NOT use MediaQuery.of(context) here.
     _pageController = PageController(
-      viewportFraction: _currentViewportFraction, // Use default fraction initially
-      initialPage: (_stories.length / 2).floor(),
+      viewportFraction: _currentViewportFraction,
+      initialPage: (_stories.length / 2).floor(), // Centers the 4th item (index 3)
     );
-    // The correct fraction based on platform/orientation will be set
-    // in the first call to didChangeDependencies.
   }
 
-  // Helper function remains the same
   double _calculateViewportFraction(Orientation orientation) {
     if (kIsWeb) {
-      return 0.15; // Adjust as needed for web
+      return 0.15;
     } else {
       return orientation == Orientation.landscape ? 0.35 : 0.55;
     }
@@ -49,53 +50,30 @@ class _StoryCarouselState extends State<StoryCarousel> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
-    // This method IS the correct place to access MediaQuery
     final orientation = MediaQuery.of(context).orientation;
     final newViewportFraction = _calculateViewportFraction(orientation);
 
-    // Check if orientation OR platform (implicitly via fraction) changes
-    // This condition will be TRUE on the first run after initState because:
-    // - _lastOrientation is null initially.
-    // - OR _currentViewportFraction (default 0.55) might differ from newViewportFraction.
     if (_lastOrientation != orientation || _currentViewportFraction != newViewportFraction) {
-
-      // Store the current state
       _lastOrientation = orientation;
       _currentViewportFraction = newViewportFraction;
 
-      // Determine the page to jump to (try to keep current, else reset)
-      // Check if the controller is attached and has a valid page first
       final currentPage = (_pageController.hasClients && _pageController.position.hasContentDimensions && _pageController.page != null)
-                           ? _pageController.page!.round()
-                           : (_stories.length / 2).floor(); // Fallback to initialPage
+                          ? _pageController.page!.round()
+                          : (_stories.length / 2).floor();
 
-      // Dispose the old controller *before* creating the new one IF IT EXISTS AND HAS CLIENTS
-      // (Check hasClients to avoid issues if dispose is called before it's fully attached)
-      // A safer pattern is often to dispose in the next frame (as shown before),
-      // but simple disposal here might work if the state change handles it cleanly.
-      // Let's revert to the safer post-frame disposal just in case.
       final oldPageController = _pageController;
 
-      // Create the new controller with updated fraction and correct initial page
       _pageController = PageController(
         viewportFraction: _currentViewportFraction,
-        initialPage: currentPage, // Use determined page
+        initialPage: currentPage,
       );
 
-      // Safely dispose the old controller after the frame build
-       WidgetsBinding.instance.addPostFrameCallback((_) {
-         // Check if it's the same object in case didChangeDependencies runs rapidly
-         if (mounted && oldPageController != _pageController) {
-            oldPageController.dispose();
-         }
-       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && oldPageController != _pageController) {
+          oldPageController.dispose();
+        }
+      });
 
-
-      // No explicit setState needed here if the build method only reads _pageController,
-      // as the controller instance itself changes. However, if other parts of build
-      // depend on _currentViewportFraction or _lastOrientation, setState is needed.
-      // To be safe and ensure AnimatedBuilder updates correctly with the NEW controller:
       setState(() {});
     }
   }
@@ -108,9 +86,8 @@ class _StoryCarouselState extends State<StoryCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    // The build method remains largely the same
     return SizedBox(
-      height: 250.0,
+      height: 250.0, // You might want to adjust height based on image aspect ratio
       child: ScrollConfiguration(
         behavior: ScrollConfiguration.of(context).copyWith(
           dragDevices: {
@@ -119,52 +96,61 @@ class _StoryCarouselState extends State<StoryCarousel> {
           },
         ),
         child: PageView.builder(
-          controller: _pageController, // Uses the latest controller instance
-          itemCount: _stories.length,
+          controller: _pageController,
+          itemCount: _stories.length, // Still uses length here
           itemBuilder: (context, index) {
-            return _buildStoryItemContent(_stories[index], index);
+            // Pass the image path and index to the build method
+            // The actual string from _stories isn't needed for display now
+            return _buildStoryItemContent(_imagePath, index);
           },
         ),
       ),
     );
   }
 
-  // _buildStoryItemContent remains the same
-  Widget _buildStoryItemContent(String storyTitle, int index) {
+  // --- MODIFIED build method for the card content ---
+  Widget _buildStoryItemContent(String imageAssetPath, int index) {
     return AnimatedBuilder(
       animation: _pageController,
       builder: (context, child) {
         double value = 0.0;
         if (_pageController.hasClients && _pageController.position.hasContentDimensions) {
-           value = index - (_pageController.page ?? _pageController.initialPage.toDouble());
-           value = (1 - (value.abs() * 0.3)).clamp(0.8, 1.0);
+          value = index - (_pageController.page ?? _pageController.initialPage.toDouble());
+          value = (1 - (value.abs() * 0.3)).clamp(0.8, 1.0);
         } else {
-           value = index == _pageController.initialPage ? 1.0 : 0.8;
+          value = index == _pageController.initialPage ? 1.0 : 0.8;
         }
 
-        double cardHeight = 250;
-        double cardWidth = cardHeight * 0.6;
+        double cardHeight = 250; // Make sure this fits your image well
+        double cardWidth = cardHeight * 0.6; // Adjust aspect ratio if needed
 
         return Center(
           child: SizedBox(
             height: Curves.easeOut.transform(value) * cardHeight,
             width: Curves.easeOut.transform(value) * cardWidth,
-            child: child,
+            child: child, // This 'child' is the Card defined below
           ),
         );
       },
+      // The child passed to the builder above
       child: Card(
         margin: EdgeInsets.symmetric(
             horizontal: kIsWeb ? 8.0 : 10.0,
             vertical: 10.0
         ),
         elevation: 4.0,
-        clipBehavior: Clip.antiAlias,
+        clipBehavior: Clip.antiAlias, // Good practice for images in cards
+        child: Image.asset( // <-- Use Image.asset here
+          imageAssetPath, // Use the path passed to the function
+          fit: BoxFit.cover, // Makes the image cover the card space
+                           // Other options: BoxFit.contain, BoxFit.fill, etc.
+        ),
+        /* // --- REMOVED the previous Text widget ---
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              storyTitle,
+              storyTitle, // No longer using storyTitle for display
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 18.0),
               overflow: TextOverflow.ellipsis,
@@ -172,6 +158,7 @@ class _StoryCarouselState extends State<StoryCarousel> {
             ),
           ),
         ),
+        */
       ),
     );
   }
