@@ -1,66 +1,87 @@
 // lib/repositories/hive_card_data_repository.dart
 
-import 'package:hive/hive.dart'; // You might use hive_flutter instead/as well
+import 'package:hive/hive.dart';
+// Using collection package for potential sorting stability, optional but good practice
+import 'package:collection/collection.dart';
+
 import '../models/card_info.dart';       // Adjust path as needed
 import 'card_data_repository.dart';   // Adjust path as needed
 
 /// Concrete implementation of CardDataRepository using Hive for local storage.
+/// Assumes CardInfo objects have a unique `uniqueId` field used as the Hive key,
+/// and a `positionIndex` field for ordering.
 class HiveCardDataRepository implements CardDataRepository {
 
   /// The name of the Hive box used to store card information.
-  /// It's good practice to define box names as constants.
-  static const String boxName = 'cardDataBox';
+  static const String boxName = 'cardDataBox'; // Keep using the same box name
 
   /// Reference to the opened Hive box.
-  /// We get this instance rather than opening it here directly.
+  /// The box stores CardInfo objects, using their uniqueId (String) as the key.
   final Box<CardInfo> _cardBox;
 
   /// Constructor requires an opened Box<CardInfo> instance.
-  /// This promotes dependency injection and makes testing easier.
-  HiveCardDataRepository(this._cardBox) {
-     // Optional: You could add a check here to ensure the box is actually open,
-     // though typically the injection setup should guarantee this.
-     // assert(_cardBox.isOpen, 'The Hive box "$boxName" must be opened before injecting it.');
-  }
+  HiveCardDataRepository(this._cardBox);
 
-  /// Retrieves CardInfo from the Hive box using the slotIndex as the key.
+  /// Retrieves CardInfo from the Hive box using the uniqueId as the key.
+  /// Matches the updated interface signature.
   @override
-  Future<CardInfo?> getCardInfo(int slotIndex) async {
+  Future<CardInfo?> getCardInfo(String uniqueId) async {
     // Hive's box.get() is synchronous, but we fulfill the Future-based contract.
-    // The 'async' keyword automatically wraps the return value in a Future.
-    return _cardBox.get(slotIndex);
+    return _cardBox.get(uniqueId);
   }
 
-  /// Saves/updates CardInfo in the Hive box using the slotIndex as the key.
+  /// Saves/updates CardInfo in the Hive box using the object's uniqueId as the key.
+  /// Matches the updated interface signature.
+  /// Assumes data.uniqueId is a non-null, non-empty string.
   @override
-  Future<void> saveCardInfo(int slotIndex, CardInfo data) async {
-    // Hive's box.put() can return Future<void>, so we await it.
-    await _cardBox.put(slotIndex, data);
-  }
-
-  // --- Implementation for Optional Methods (if you added them to the interface) ---
-
-  /*
-  @override
-  Future<List<CardInfo?>> getAllCardInfos() async {
-    // Assuming a fixed number of slots, e.g., 7, is desired.
-    // If you just want all *existing* entries regardless of index,
-    // you could use _cardBox.values.toList(), but that might not
-    // match the concept of fixed slots 0-6.
-    const int numberOfSlots = 7; // Or get this dynamically if needed
-    final List<CardInfo?> allInfos = [];
-    for (int i = 0; i < numberOfSlots; i++) {
-      allInfos.add(_cardBox.get(i)); // Add entry or null if key doesn't exist
+  Future<void> saveCardInfo(CardInfo data) async {
+    // Use the uniqueId from the data object itself as the key
+    // Ensure uniqueId is not null or empty before putting, or handle error
+    if (data.uniqueId.isEmpty) {
+       throw ArgumentError('CardInfo uniqueId cannot be empty when saving.');
     }
-    return allInfos;
+    await _cardBox.put(data.uniqueId, data);
   }
-  */
 
-  /*
+  /// Retrieves all CardInfo objects from the box and sorts them by positionIndex.
+  /// Implements the new interface method.
   @override
-  Future<void> deleteCardInfo(int slotIndex) async {
-    await _cardBox.delete(slotIndex);
-  }
-  */
+  Future<List<CardInfo>> getAllCardsSortedByPosition() async {
+    // Get all values currently stored in the box.
+    // .values returns an Iterable<CardInfo> containing only non-null objects.
+    final List<CardInfo> allCards = _cardBox.values.toList();
 
+    // Sort the list based on the positionIndex field within each CardInfo object.
+    allCards.sort((a, b) => compareInt(a.positionIndex, b.positionIndex));
+    // Alternative simpler sort if positionIndex is guaranteed non-null:
+    // allCards.sort((a, b) => a.positionIndex.compareTo(b.positionIndex));
+
+    return allCards;
+  }
+
+  /// Deletes the CardInfo object associated with the given unique ID.
+  /// Implements the new interface method.
+  @override
+  Future<void> deleteCardInfo(String uniqueId) async {
+    // Ensure uniqueId is not null or empty before deleting, or handle error
+    if (uniqueId.isEmpty) {
+       throw ArgumentError('uniqueId cannot be empty when deleting.');
+    }
+    await _cardBox.delete(uniqueId);
+  }
+
+  // Helper function for stable sorting (optional but good practice)
+  int compareInt(int a, int b) {
+    // Basic comparison
+    return a.compareTo(b);
+    /* // More robust comparison if needed
+    if (a < b) {
+      return -1;
+    } else if (a > b) {
+      return 1;
+    } else {
+      return 0; // Keep original order if equal (stable sort behavior)
+    }
+    */
+  }
 }

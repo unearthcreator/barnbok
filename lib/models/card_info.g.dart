@@ -17,24 +17,30 @@ class CardInfoAdapter extends TypeAdapter<CardInfo> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return CardInfo(
-      surname: fields[0] as String,
-      lastName: fields[1] as String,
-      imagePath: fields[2] as String,
-      serverId: fields[3] as String?,
+      uniqueId: fields[0] as String,
+      surname: fields[1] as String,
+      lastName: fields[2] as String,
+      imagePath: fields[3] as String,
+      positionIndex: fields[4] as int,
+      serverId: fields[5] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, CardInfo obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(6)
       ..writeByte(0)
-      ..write(obj.surname)
+      ..write(obj.uniqueId)
       ..writeByte(1)
-      ..write(obj.lastName)
+      ..write(obj.surname)
       ..writeByte(2)
-      ..write(obj.imagePath)
+      ..write(obj.lastName)
       ..writeByte(3)
+      ..write(obj.imagePath)
+      ..writeByte(4)
+      ..write(obj.positionIndex)
+      ..writeByte(5)
       ..write(obj.serverId);
   }
 
