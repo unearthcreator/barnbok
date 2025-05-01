@@ -18,10 +18,6 @@ Future<void> main() async {
     await Hive.initFlutter();
     print('Hive Initialized.');
 
-    // --- TEMPORARY: Delete the existing box to clear old data ---
-    print('Attempting to delete existing box: "${HiveCardDataRepository.boxName}"...');
-    await Hive.deleteBoxFromDisk(HiveCardDataRepository.boxName);
-    print('Box deleted (if it existed).');
     // --- END TEMPORARY ---
 
     print('Registering CardInfoAdapter...');
