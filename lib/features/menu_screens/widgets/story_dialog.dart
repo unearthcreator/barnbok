@@ -149,79 +149,85 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
   }
   // --- End submit form ---
 
-  @override
-  Widget build(BuildContext context) {
-    // Build the AlertDialog structure
-    return AlertDialog(
-      title: const Text('Create New Story'),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-      contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 0.0),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min, // Important for scroll view
-            children: <Widget>[
-              TextFormField(
-                controller: _surnameController,
-                enabled: !_isSaving, // Disable field while saving
-                decoration: const InputDecoration(
-                  labelText: 'First Name',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+  // --- Updated dialog layout ---
+@override
+Widget build(BuildContext context) {
+  return AlertDialog(
+    insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+    contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 0.0),
+    content: SingleChildScrollView(
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _surnameController,
+                    enabled: !_isSaving,
+                    decoration: const InputDecoration(
+                      labelText: 'First Name',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Required';
+                      }
+                      return null;
+                    },
+                  ),
                 ),
-                textCapitalization: TextCapitalization.words,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Required';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _lastNameController,
-                enabled: !_isSaving, // Disable field while saving
-                decoration: const InputDecoration(
-                  labelText: 'Last Name',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _lastNameController,
+                    enabled: !_isSaving,
+                    decoration: const InputDecoration(
+                      labelText: 'Last Name',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Required';
+                      }
+                      return null;
+                    },
+                  ),
                 ),
-                textCapitalization: TextCapitalization.words,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Required';
-                  }
-                  return null;
-                },
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
       ),
-      actionsPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      actions: <Widget>[
-        // Show Cancel button only if not saving
-        if (!_isSaving)
-          TextButton(
-            child: const Text('Cancel'),
-            onPressed: () {
-              Navigator.of(context).pop(null); // Close and return null
-            },
-          ),
-        // Show progress indicator or button
-        ElevatedButton(
-          // Disable button while saving or if repo failed init
-          onPressed: (_isSaving || !_repoInitialized) ? null : _submitForm,
-          child: _isSaving
-              ? const SizedBox( // Show progress indicator
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : const Text('Create My Story'),
+    ),
+    actionsPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+    actions: <Widget>[
+      if (!_isSaving)
+        TextButton(
+          child: const Text('Cancel'),
+          onPressed: () {
+            Navigator.of(context).pop(null);
+          },
         ),
-      ],
-    );
-  }
+      ElevatedButton(
+        onPressed: (_isSaving || !_repoInitialized) ? null : _submitForm,
+        child: _isSaving
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : const Text('Create My Story'),
+      ),
+    ],
+  );
+}
+
 }

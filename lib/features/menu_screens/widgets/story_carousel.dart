@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart'; // Needed for kIsWeb
-import 'package:uuid/uuid.dart'; // Import the UUID package
+// Import the UUID package
 import 'package:hive/hive.dart'; // Import Hive
 import 'package:collection/collection.dart'; // Import for firstWhereOrNull
 

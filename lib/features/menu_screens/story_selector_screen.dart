@@ -98,57 +98,53 @@ class _StorySelectorScreenState extends State<StorySelectorScreen> {
 
 
   @override
-  Widget build(BuildContext context) {
-    // The UI structure remains the same
-    return Scaffold(
-      appBar: AppBar(
-         actions: [
-           // Add a temporary clear button to the AppBar for easy access
-           IconButton(
-             icon: const Icon(Icons.delete_forever, color: Colors.red),
-             tooltip: 'Clear All Saved Cards (Debug)',
-             onPressed: () async {
-               // Show a confirmation dialog before clearing
-               final confirm = await showDialog<bool>(
-                 context: context,
-                 builder: (BuildContext context) {
-                   return AlertDialog(
-                     title: const Text('Confirm Clear'),
-                     content: const Text('Are you sure you want to delete ALL saved card data? This cannot be undone.'),
-                     actions: <Widget>[
-                       TextButton(
-                         child: const Text('Cancel'),
-                         onPressed: () {
-                           Navigator.of(context).pop(false); // Return false
-                         },
-                       ),
-                       TextButton(
-                         style: TextButton.styleFrom(foregroundColor: Colors.red),
-                         child: const Text('Clear All Data'),
-                         onPressed: () {
-                           Navigator.of(context).pop(true); // Return true
-                         },
-                       ),
-                     ],
-                   );
-                 },
-               );
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.delete_forever, color: Colors.red),
+          tooltip: 'Clear All Saved Cards (Debug)',
+          onPressed: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Confirm Clear'),
+                content: const Text(
+                    'Are you sure you want to delete ALL saved card data? This cannot be undone.'),
+                actions: [
+                  TextButton(
+                    child: const Text('Cancel'),
+                    onPressed: () => Navigator.of(context).pop(false),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    child: const Text('Clear All Data'),
+                    onPressed: () => Navigator.of(context).pop(true),
+                  ),
+                ],
+              ),
+            );
 
-               // If the user confirmed, proceed with clearing
-               if (confirm == true) {
-                  await _clearHiveBox();
-               }
-             },
-           ),
-         ],
-      ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [ // Use const for static children
-           StoryCarousel(), // The carousel widget instance
-           SizedBox(height: 20),
+            if (confirm == true) {
+              await _clearHiveBox();
+            }
+          },
+        ),
+      ],
+    ),
+    body: SingleChildScrollView(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            StoryCarousel(),
+            SizedBox(height: 20),
         ],
-      )
-    );
-  }
+      ),
+  ),
+),
+  );
+}
 }
