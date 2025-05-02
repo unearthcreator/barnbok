@@ -243,20 +243,19 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
               const SizedBox(height: 8),
 
               // --- ProfileImageSelector with initial path if editing ---
-              ProfileImageSelector(
-                // Pass existing path if editing, otherwise null
-                initialImagePath: widget.existingCard?.imagePath,
-                // Still need placeholder for default display within selector
-                placeholderImagePath: fakeImagePath,
-                isDisabled: _isSaving,
-                onImageSelected: (File? selectedImage) {
-                  // Update the dialog's state variable to track NEW selection
-                  setState(() {
-                    _finalSelectedImageFile = selectedImage;
-                  });
-                  print("CreateStoryDialog: Received image update: ${_finalSelectedImageFile?.path}");
-                },
-              ),
+              // --- ProfileImageSelector with fixed initial path ---
+                  ProfileImageSelector(
+                    initialImagePath: widget.existingCard?.imagePath ?? fakeImagePath, // FIX applied here
+                    placeholderImagePath: fakeImagePath,
+                    isDisabled: _isSaving,
+                    onImageSelected: (File? selectedImage) {
+                      setState(() {
+                        _finalSelectedImageFile = selectedImage;
+                      });
+                      print("CreateStoryDialog: Received image update: ${_finalSelectedImageFile?.path}");
+                    },
+                  ),
+
               // --- End Image Picker Section ---
             ],
           ),
