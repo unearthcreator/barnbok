@@ -1,15 +1,17 @@
-// lib/features/menu_screens/widgets/create_story_dialog.dart
-
-import 'dart:io'; // Import for File
+import 'dart:io'; // Still needed for File type in state and callback
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // Import image_picker
+// import 'package:image_picker/image_picker.dart'; // No longer needed here
 import 'package:uuid/uuid.dart';
 import 'package:hive/hive.dart';
+
+// Import the new widget
+import 'package:barnbok/features/menu_screens/profile_image_selector.dart';
 
 // Adjust paths as needed
 import 'package:barnbok/models/card_info.dart';
 import 'package:barnbok/repositories/card_data_repository.dart';
 import 'package:barnbok/repositories/hive_card_data_repository.dart';
+
 
 // --- showCreateStoryDialog function (no changes) ---
 Future<bool?> showCreateStoryDialog(BuildContext context, int positionIndex) async {
@@ -40,9 +42,14 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
   late final CardDataRepository _repository;
   bool _repoInitialized = false;
 
-  File? _selectedImageFile;
-  final ImagePicker _picker = ImagePicker();
+  // --- REMOVED image picker state/logic ---
+  // File? _selectedImageFile;         // REMOVED
+  // final ImagePicker _picker = ImagePicker(); // REMOVED
 
+  // --- ADDED state variable to hold the file passed back from the selector ---
+  File? _finalSelectedImageFile;
+
+  // Keep placeholder path accessible for submitForm default
   static const String fakeImagePath = 'assets/images/baby_foot_ceramic.jpg';
 
   @override
@@ -81,39 +88,11 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    // ... (_pickImage method - no changes)
-    if (_isSaving) return;
-
-    try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery,
-        // imageQuality: 80,
-        // maxWidth: 800,
-      );
-
-      if (pickedFile != null) {
-        setState(() {
-          _selectedImageFile = File(pickedFile.path);
-          print("Image selected: ${pickedFile.path}");
-        });
-      } else {
-        print("Image selection cancelled.");
-      }
-    } catch (e) {
-      print("Error picking image: $e");
-      if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Kunde inte välja bild. Kontrollera behörigheter.'))
-          );
-      }
-    }
-  }
-
+  // --- REMOVED _pickImage method ---
+  // Future<void> _pickImage() async { ... } // REMOVED
 
   Future<void> _submitForm() async {
-   // ... (_submitForm method - no changes)
-   if (!_repoInitialized || _isSaving) return;
+    if (!_repoInitialized || _isSaving) return;
 
     if (_formKey.currentState!.validate()) {
       setState(() { _isSaving = true; });
@@ -123,11 +102,12 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
         final String lastName = _lastNameController.text.trim();
         final String uniqueId = const Uuid().v4();
 
-        String imagePathToSave = fakeImagePath;
-        if (_selectedImageFile != null) {
-          // Consider copying file for persistence later
-          imagePathToSave = _selectedImageFile!.path;
+        String imagePathToSave = fakeImagePath; // Use the constant defined here
+        // --- UPDATED to use the state variable holding the callback result ---
+        if (_finalSelectedImageFile != null) {
+          imagePathToSave = _finalSelectedImageFile!.path;
         }
+        // --- End determining image path ---
 
         final newCardData = CardInfo(
           uniqueId: uniqueId,
@@ -141,6 +121,7 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
         await _repository.saveCardInfo(newCardData);
 
         print('--- SAVE SUCCESS ---');
+        // ... (rest of print statements - no changes)
         print('Saved Card Info:');
         print('  UUID: ${newCardData.uniqueId}');
         print('  Surname: ${newCardData.surname}');
@@ -148,6 +129,7 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
         print('  Image Path: ${newCardData.imagePath}');
         print('  Position Index: ${newCardData.positionIndex}');
         print('--------------------');
+
 
         if (mounted) {
           Navigator.of(context).pop(true);
@@ -167,19 +149,8 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
 
   @override
   Widget build(BuildContext context) {
-    // Define placeholder widget with correct styling
-    Widget imagePlaceholder = Container(
-        width: 75,
-        height: 100,
-        decoration: BoxDecoration(
-            // No background color
-            borderRadius: BorderRadius.circular(8),
-            image: const DecorationImage(
-                image: AssetImage(fakeImagePath),
-                fit: BoxFit.contain, // Use contain
-            )
-        ),
-    );
+    // --- REMOVED imagePlaceholder definition ---
+    // Widget imagePlaceholder = Container(...); // REMOVED
 
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
@@ -198,41 +169,43 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
                 child: Text('Förnamn', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700])),
               ),
               TextFormField(
-                controller: _surnameController,
-                enabled: !_isSaving,
-                decoration: InputDecoration(
-                  hintText: '(Obligatoriskt)',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                textCapitalization: TextCapitalization.words,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Obligatorisk';
-                  }
-                  return null;
-                },
+                 controller: _surnameController,
+                 enabled: !_isSaving,
+                 // ... (rest of TextFormField - no changes)
+                 decoration: InputDecoration(
+                    hintText: '(Obligatoriskt)',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Obligatorisk';
+                    }
+                    return null;
+                  },
               ),
               const SizedBox(height: 16),
 
               // --- Last Name (No changes) ---
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4.0),
-                child: Text('Efternamn (valfritt)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700])),
-              ),
+               Padding(
+                 padding: const EdgeInsets.only(bottom: 4.0),
+                 child: Text('Efternamn (valfritt)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700])),
+               ),
               TextFormField(
                 controller: _lastNameController,
                 enabled: !_isSaving,
-                decoration: InputDecoration(
-                  hintText: '(valfritt)',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                textCapitalization: TextCapitalization.words,
+                // ... (rest of TextFormField - no changes)
+                 decoration: InputDecoration(
+                    hintText: '(valfritt)',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                  textCapitalization: TextCapitalization.words,
               ),
               const SizedBox(height: 20),
 
@@ -243,53 +216,18 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700]),
               ),
               const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
 
-                  // --- WRAPPED Image Preview Area with InkWell ---
-                  InkWell(
-                    // Call _pickImage on tap, disable if saving
-                    onTap: _isSaving ? null : _pickImage,
-                    // Apply border radius to InkWell ripple effect
-                    borderRadius: BorderRadius.circular(8.0),
-                    child: Container(
-                      width: 75, // Portrait size
-                      height: 100,
-                      decoration: BoxDecoration(
-                        // No border or background color here
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: ClipRRect( // Clip the image content
-                        borderRadius: BorderRadius.circular(8.0),
-                        child: _selectedImageFile != null
-                            ? Image.file(
-                                _selectedImageFile!,
-                                fit: BoxFit.contain, // Use contain
-                                width: 75,
-                                height: 100,
-                                errorBuilder: (context, error, stackTrace) {
-                                  print("Error loading image file: $error");
-                                  return imagePlaceholder;
-                                },
-                              )
-                            : imagePlaceholder, // Show placeholder
-                      ),
-                    ),
-                  ),
-                  // --- End WRAPPED Image Preview Area ---
-
-                  const SizedBox(width: 16), // Spacing
-
-                  // Choose Image Button (remains the same)
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _isSaving ? null : _pickImage,
-                      icon: const Icon(Icons.image_search),
-                      label: Text(_selectedImageFile == null ? 'Välj bild' : 'Ändra bild'),
-                    ),
-                  ),
-                ],
+              // --- REPLACED Row with the new ProfileImageSelector widget ---
+              ProfileImageSelector(
+                placeholderImagePath: fakeImagePath, // Pass the placeholder path
+                isDisabled: _isSaving, // Pass the disabled state
+                onImageSelected: (File? selectedImage) {
+                  // Update the dialog's state variable when the selector provides a file
+                  setState(() {
+                    _finalSelectedImageFile = selectedImage;
+                  });
+                  print("CreateStoryDialog: Received image update: ${_finalSelectedImageFile?.path}");
+                },
               ),
               // --- End Image Picker Section ---
 
