@@ -11,7 +11,7 @@ import 'package:barnbok/models/card_info.dart';
 import 'package:barnbok/repositories/card_data_repository.dart';
 import 'package:barnbok/repositories/hive_card_data_repository.dart';
 
-// --- showCreateStoryDialog function remains the same ---
+// --- showCreateStoryDialog function (no changes) ---
 Future<bool?> showCreateStoryDialog(BuildContext context, int positionIndex) async {
   final result = await showDialog<bool?>(
     context: context,
@@ -26,7 +26,7 @@ Future<bool?> showCreateStoryDialog(BuildContext context, int positionIndex) asy
 
 class _CreateStoryDialogContent extends StatefulWidget {
   final int positionIndex;
-  const _CreateStoryDialogContent({required this.positionIndex, super.key}); // Added key
+  const _CreateStoryDialogContent({required this.positionIndex, super.key});
 
   @override
   State<_CreateStoryDialogContent> createState() => _CreateStoryDialogContentState();
@@ -40,13 +40,10 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
   late final CardDataRepository _repository;
   bool _repoInitialized = false;
 
-  // --- NEW STATE VARIABLE for selected image ---
   File? _selectedImageFile;
-  final ImagePicker _picker = ImagePicker(); // Instance of ImagePicker
+  final ImagePicker _picker = ImagePicker();
 
-  // Placeholder path (remains useful)
   static const String fakeImagePath = 'assets/images/baby_foot_ceramic.jpg';
-
 
   @override
   void initState() {
@@ -57,8 +54,8 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
   }
 
   Future<void> _initializeRepository() async {
-    // ... (repository initialization logic remains the same)
-    try {
+    // ... (repository initialization logic - no changes)
+     try {
       if (!Hive.isBoxOpen(HiveCardDataRepository.boxName)) {
         print("CreateStoryDialog: Warning - Box was not open.");
         _repoInitialized = false;
@@ -72,7 +69,6 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
       print("CreateStoryDialog: Error initializing repository: $e");
       _repoInitialized = false;
     }
-    // Trigger a rebuild if initialization state changes after frame build
     if (mounted) {
         setState(() {});
     }
@@ -85,15 +81,13 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
     super.dispose();
   }
 
-  // --- NEW METHOD: Pick Image ---
   Future<void> _pickImage() async {
-    // Ensure user isn't saving while picking
+    // ... (_pickImage method - no changes)
     if (_isSaving) return;
 
     try {
       final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery, // Or ImageSource.camera
-        // Optional: Add constraints like imageQuality or maxWidth/maxHeight
+        source: ImageSource.gallery,
         // imageQuality: 80,
         // maxWidth: 800,
       );
@@ -104,26 +98,22 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
           print("Image selected: ${pickedFile.path}");
         });
       } else {
-        // User canceled the picker
         print("Image selection cancelled.");
       }
     } catch (e) {
-      // Handle potential errors (e.g., permissions denied)
       print("Error picking image: $e");
-      // Optionally show a snackbar or alert to the user
       if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Kunde inte välja bild. Kontrollera behörigheter.')) // Could not pick image. Check permissions.
+            const SnackBar(content: Text('Kunde inte välja bild. Kontrollera behörigheter.'))
           );
       }
     }
   }
-  // --- End Pick Image Method ---
 
 
-  // --- UPDATED submit form ---
   Future<void> _submitForm() async {
-    if (!_repoInitialized || _isSaving) return;
+   // ... (_submitForm method - no changes)
+   if (!_repoInitialized || _isSaving) return;
 
     if (_formKey.currentState!.validate()) {
       setState(() { _isSaving = true; });
@@ -133,22 +123,17 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
         final String lastName = _lastNameController.text.trim();
         final String uniqueId = const Uuid().v4();
 
-        // --- Determine image path to save ---
-        String imagePathToSave = fakeImagePath; // Default to placeholder
+        String imagePathToSave = fakeImagePath;
         if (_selectedImageFile != null) {
-          // IMPORTANT: Using the direct path from the picker might point to a
-          // temporary file. For long-term storage, you should ideally COPY
-          // the file to your app's private directory (e.g., using path_provider)
-          // and save THAT path. For simplicity now, we save the picker's path.
+          // Consider copying file for persistence later
           imagePathToSave = _selectedImageFile!.path;
         }
-        // --- End determining image path ---
 
         final newCardData = CardInfo(
           uniqueId: uniqueId,
           surname: surname,
           lastName: lastName.isEmpty ? null : lastName,
-          imagePath: imagePathToSave, // Use the determined path
+          imagePath: imagePathToSave,
           positionIndex: widget.positionIndex,
         );
 
@@ -160,7 +145,7 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
         print('  UUID: ${newCardData.uniqueId}');
         print('  Surname: ${newCardData.surname}');
         print('  Last Name: ${newCardData.lastName ?? 'N/A'}');
-        print('  Image Path: ${newCardData.imagePath}'); // Will show selected path or placeholder
+        print('  Image Path: ${newCardData.imagePath}');
         print('  Position Index: ${newCardData.positionIndex}');
         print('--------------------');
 
@@ -172,33 +157,32 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
         print('CreateStoryDialog: Error saving card data: $e\n$stackTrace');
         if (mounted) {
           setState(() { _isSaving = false; });
-           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Kunde inte spara berättelsen.')) // Could not save story.
-          );
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Kunde inte spara berättelsen.'))
+            );
         }
       }
     }
   }
-  // --- End submit form ---
 
   @override
   Widget build(BuildContext context) {
-    // Define placeholder widget separately for clarity
+    // Define placeholder widget with correct styling
     Widget imagePlaceholder = Container(
-        width: 80,
-        height: 80,
+        width: 75,
+        height: 100,
         decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: BorderRadius.circular(8), // Rounded corners
+            // No background color
+            borderRadius: BorderRadius.circular(8),
             image: const DecorationImage(
-                image: AssetImage(fakeImagePath), // Show placeholder inside
-                fit: BoxFit.cover)),
-        // child: Icon(Icons.person, size: 40, color: Colors.grey[400]), // Alternative: show icon
-        );
+                image: AssetImage(fakeImagePath),
+                fit: BoxFit.contain, // Use contain
+            )
+        ),
+    );
 
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-      // Increased vertical padding slightly to accommodate image picker
       contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 10.0),
       content: SingleChildScrollView(
         child: Form(
@@ -250,56 +234,59 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
                 ),
                 textCapitalization: TextCapitalization.words,
               ),
-              const SizedBox(height: 20), // Increased spacing before image picker
+              const SizedBox(height: 20),
 
 
-              // --- NEW: Image Picker Section ---
+              // --- Image Picker Section ---
               Text(
                   'Profilbild (valfritt)',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700]),
               ),
               const SizedBox(height: 8),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center, // Align items vertically
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Image Preview Area
-                  Container(
-                    width: 80, // Set fixed size for preview
-                    height: 80,
-                    decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(8), // Match placeholder
-                    ),
-                    child: _selectedImageFile != null
-                        ? ClipRRect( // Clip image to rounded corners
-                              borderRadius: BorderRadius.circular(8.0),
-                              child: Image.file(
-                                _selectedImageFile!,
-                                fit: BoxFit.cover, // Cover the area
-                                width: 80,
-                                height: 80,
-                                errorBuilder: (context, error, stackTrace) {
-                                    // Show placeholder if image file fails to load
-                                    print("Error loading image file: $error");
-                                    return imagePlaceholder;
-                                },
-                                ),
-                            )
-                        : imagePlaceholder, // Show placeholder if no image selected
-                    ),
 
-                  const SizedBox(width: 16), // Spacing between preview and button
-
-                  // Choose Image Button
-                  Expanded( // Allow button to take remaining space if needed (optional)
-                    child: ElevatedButton.icon(
-                       // Changed to icon button for better look
-                      onPressed: _isSaving ? null : _pickImage, // Disable while saving
-                      icon: const Icon(Icons.image_search),
-                      label: Text(_selectedImageFile == null ? 'Välj bild' : 'Ändra bild'), // Choose / Change Image
-                      style: ElevatedButton.styleFrom(
-                         // Add some style if desired
+                  // --- WRAPPED Image Preview Area with InkWell ---
+                  InkWell(
+                    // Call _pickImage on tap, disable if saving
+                    onTap: _isSaving ? null : _pickImage,
+                    // Apply border radius to InkWell ripple effect
+                    borderRadius: BorderRadius.circular(8.0),
+                    child: Container(
+                      width: 75, // Portrait size
+                      height: 100,
+                      decoration: BoxDecoration(
+                        // No border or background color here
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      child: ClipRRect( // Clip the image content
+                        borderRadius: BorderRadius.circular(8.0),
+                        child: _selectedImageFile != null
+                            ? Image.file(
+                                _selectedImageFile!,
+                                fit: BoxFit.contain, // Use contain
+                                width: 75,
+                                height: 100,
+                                errorBuilder: (context, error, stackTrace) {
+                                  print("Error loading image file: $error");
+                                  return imagePlaceholder;
+                                },
+                              )
+                            : imagePlaceholder, // Show placeholder
+                      ),
+                    ),
+                  ),
+                  // --- End WRAPPED Image Preview Area ---
+
+                  const SizedBox(width: 16), // Spacing
+
+                  // Choose Image Button (remains the same)
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _isSaving ? null : _pickImage,
+                      icon: const Icon(Icons.image_search),
+                      label: Text(_selectedImageFile == null ? 'Välj bild' : 'Ändra bild'),
                     ),
                   ),
                 ],
@@ -310,9 +297,9 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
           ),
         ),
       ),
-      // Actions Padding adjusted if needed
       actionsPadding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 8.0),
       actions: <Widget>[
+        // ... (Actions - no changes) ...
         if (!_isSaving)
           TextButton(
             child: const Text('Avbryt'),
@@ -321,7 +308,6 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
             },
           ),
         ElevatedButton(
-          // Disable button if repo not ready OR if saving
           onPressed: (_isSaving || !_repoInitialized) ? null : _submitForm,
           child: _isSaving
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
