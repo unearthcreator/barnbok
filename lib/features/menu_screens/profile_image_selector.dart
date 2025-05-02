@@ -1,20 +1,18 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 
 class ProfileImageSelector extends StatefulWidget {
-  // Callback function to notify the parent widget when an image is selected/changed.
   final Function(File? imageFile) onImageSelected;
-  // Flag to disable the picker controls (e.g., while parent is saving).
   final bool isDisabled;
-  // Path for the default placeholder image.
   final String placeholderImagePath;
 
   const ProfileImageSelector({
     super.key,
     required this.onImageSelected,
     required this.placeholderImagePath,
-    this.isDisabled = false, // Default to enabled
+    this.isDisabled = false,
   });
 
   @override
@@ -22,51 +20,74 @@ class ProfileImageSelector extends StatefulWidget {
 }
 
 class _ProfileImageSelectorState extends State<ProfileImageSelector> {
-  // State variable local to this widget to hold the selected image file.
   File? _selectedImageFile;
-  // ImagePicker instance local to this widget.
   final ImagePicker _picker = ImagePicker();
 
-  // Method to handle picking an image (without cropping for now).
   Future<void> _pickImage() async {
-    // Do nothing if the widget is disabled.
     if (widget.isDisabled) return;
+
+    final theme = Theme.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.gallery,
       );
 
-      File? newlySelectedFile; // Temporary variable
+      File? finalResultFile;
 
       if (pickedFile != null) {
-        newlySelectedFile = File(pickedFile.path);
         print("ProfileImageSelector: Image selected: ${pickedFile.path}");
+
+        final CroppedFile? croppedFile = await ImageCropper().cropImage(
+          sourcePath: pickedFile.path,
+          // --- CHANGE 1: Update Aspect Ratio Here ---
+          aspectRatio: const CropAspectRatio(ratioX: 7, ratioY: 10), // Changed from 3:4 to 7:10
+          uiSettings: [
+            AndroidUiSettings(
+                toolbarTitle: 'Beskär bild',
+                toolbarColor: theme.primaryColor,
+                toolbarWidgetColor: Colors.white,
+                initAspectRatio: CropAspectRatioPreset.original,
+                lockAspectRatio: true, // Keep locked
+                hideBottomControls: false
+            ),
+            IOSUiSettings(
+                title: 'Beskär bild',
+                aspectRatioLockEnabled: true, // Keep locked
+                resetAspectRatioEnabled: false,
+                aspectRatioPickerButtonHidden: true,
+                doneButtonTitle: 'Klar',
+                cancelButtonTitle: 'Avbryt'
+            ),
+          ],
+        );
+
+        if (croppedFile != null) {
+          finalResultFile = File(croppedFile.path);
+          print("ProfileImageSelector: Image cropped: ${croppedFile.path}");
+        } else {
+          print("ProfileImageSelector: Image cropping cancelled.");
+        }
+
       } else {
-        // User canceled the picker - explicitly set to null if needed,
-        // though newlySelectedFile is already null here.
         print("ProfileImageSelector: Image selection cancelled.");
       }
 
-      // Update the local state to refresh the preview.
       setState(() {
-        _selectedImageFile = newlySelectedFile;
+        _selectedImageFile = finalResultFile;
       });
-
-      // Notify the parent widget about the selected file (or null if cancelled).
       widget.onImageSelected(_selectedImageFile);
 
     } catch (e) {
-      print("ProfileImageSelector: Error picking image: $e");
+      print("ProfileImageSelector: Error picking/cropping image: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kunde inte välja bild. Kontrollera behörigheter.'))
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text('Kunde inte välja eller beskära bild.'))
         );
       }
-      // Notify parent that selection failed / resulted in null
-      // Only call if the previous state wasn't already null, to avoid redundant calls
       if (_selectedImageFile != null) {
-         setState(() { _selectedImageFile = null; }); // Clear local preview on error too
+         setState(() { _selectedImageFile = null; });
          widget.onImageSelected(null);
       }
     }
@@ -74,15 +95,18 @@ class _ProfileImageSelectorState extends State<ProfileImageSelector> {
 
   @override
   Widget build(BuildContext context) {
-    // Define placeholder widget using the path passed in constructor
+    // --- CHANGE 2: Update Preview Dimensions ---
+    const double previewHeight = 100.0;
+    const double previewWidth = previewHeight * (7 / 10); // Calculate width based on 7:10 ratio
+
     Widget imagePlaceholder = Container(
-        width: 75,
-        height: 100,
+        width: previewWidth,  // Use calculated width
+        height: previewHeight, // Use defined height
         decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             image: DecorationImage(
                 image: AssetImage(widget.placeholderImagePath),
-                fit: BoxFit.contain,
+                fit: BoxFit.contain, // Contain is fine for placeholder
             )
         ),
     );
@@ -90,45 +114,41 @@ class _ProfileImageSelectorState extends State<ProfileImageSelector> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Clickable Image Preview Area
         InkWell(
-          onTap: widget.isDisabled ? null : _pickImage, // Use local _pickImage
+          onTap: widget.isDisabled ? null : _pickImage,
           borderRadius: BorderRadius.circular(8.0),
           child: Container(
-            width: 75,
-            height: 100,
+            width: previewWidth,  // Use calculated width
+            height: previewHeight, // Use defined height
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
+              // Optional: Add a subtle border if needed for visual separation
+              // border: Border.all(color: Colors.grey.shade300, width: 1),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8.0),
-              child: _selectedImageFile != null // Use local _selectedImageFile
+              child: _selectedImageFile != null
                   ? Image.file(
                       _selectedImageFile!,
-                      fit: BoxFit.contain,
-                      width: 75,
-                      height: 100,
+                      fit: BoxFit.cover, // Cover should work well now
+                      width: previewWidth,  // Use calculated width
+                      height: previewHeight, // Use defined height
                       errorBuilder: (context, error, stackTrace) {
                         print("ProfileImageSelector: Error loading image file: $error");
-                        // Optionally call onImageSelected(null) if load fails after selection?
-                        // For now, just show placeholder
                         return imagePlaceholder;
                       },
                     )
-                  : imagePlaceholder, // Show placeholder
+                  : imagePlaceholder,
             ),
           ),
         ),
 
-        const SizedBox(width: 16), // Spacing
+        const SizedBox(width: 16),
 
-        // Choose/Change Image Button
         Expanded(
           child: ElevatedButton.icon(
-            // Disable if globally disabled OR if no image selected yet? No, allow picking always if not disabled.
-            onPressed: widget.isDisabled ? null : _pickImage, // Use local _pickImage
+            onPressed: widget.isDisabled ? null : _pickImage,
             icon: const Icon(Icons.image_search),
-            // Label depends on local state
             label: Text(_selectedImageFile == null ? 'Välj bild' : 'Ändra bild'),
           ),
         ),
