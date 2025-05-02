@@ -8,7 +8,7 @@ import 'package:collection/collection.dart';
 import 'package:barnbok/models/card_info.dart';
 import 'package:barnbok/repositories/card_data_repository.dart';
 import 'package:barnbok/repositories/hive_card_data_repository.dart';
-import 'package:barnbok/features/menu_screens/widgets/story_dialog.dart';
+import 'package:barnbok/features/menu_screens/widgets/story_dialog.dart'; // Ensure this path is correct
 
 class StoryCarousel extends StatefulWidget {
   const StoryCarousel({super.key});
@@ -23,8 +23,7 @@ class _StoryCarouselState extends State<StoryCarousel> {
    ];
   final String _defaultImagePath = 'assets/images/baby_foot_ceramic.jpg';
   late PageController _pageController;
-  Orientation? _lastOrientation; // Start as null
-  // Initialize with default portrait value
+  Orientation? _lastOrientation;
   double _currentViewportFraction = 0.55;
 
   Future<void>? _initFuture;
@@ -33,20 +32,16 @@ class _StoryCarouselState extends State<StoryCarousel> {
   bool _isLoading = true;
   bool _hasError = false;
 
-  // --- FIXED initState ---
   @override
   void initState() {
     super.initState();
-    // Initialize PageController with the DEFAULT viewport fraction.
-    // Do NOT use MediaQuery or context here.
     _pageController = PageController(
-      viewportFraction: _currentViewportFraction, // Use the default value
+      viewportFraction: _currentViewportFraction,
       initialPage: (_stories.length / 2).floor(),
     );
     _initFuture = _initializeAndLoadData();
     print("initState completed.");
   }
-  // --- End FIX ---
 
   Future<void> _initializeAndLoadData() async {
      if (!mounted) return;
@@ -83,7 +78,6 @@ class _StoryCarouselState extends State<StoryCarousel> {
      print("StoryCarousel: Loaded ${_savedCards.length} cards.");
   }
 
-  // Correctly placed calculation (no context needed here)
   double _calculateViewportFraction(Orientation orientation) {
     if (kIsWeb) {
       return 0.15;
@@ -92,34 +86,29 @@ class _StoryCarouselState extends State<StoryCarousel> {
     }
   }
 
-  // Correctly placed context-dependent logic
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final orientation = MediaQuery.of(context).orientation; // Safe to use context here
+    final orientation = MediaQuery.of(context).orientation;
     final newViewportFraction = _calculateViewportFraction(orientation);
 
-    // Check if orientation or viewport fraction actually changed OR if first run
     if (_lastOrientation != orientation || _currentViewportFraction != newViewportFraction) {
        print("didChangeDependencies: Orientation or Viewport change detected.");
 
-      _lastOrientation = orientation; // Update _lastOrientation
-      _currentViewportFraction = newViewportFraction; // Update fraction
+      _lastOrientation = orientation;
+      _currentViewportFraction = newViewportFraction;
 
-      // Determine current page robustly
       final currentPage = (_pageController.hasClients && _pageController.position.hasContentDimensions && _pageController.page != null)
                           ? _pageController.page!.round()
                           : (_stories.length / 2).floor();
 
       final oldPageController = _pageController;
 
-      // Create new controller with CORRECT fraction
       _pageController = PageController(
         viewportFraction: _currentViewportFraction,
         initialPage: currentPage,
       );
 
-      // Clean up old controller safely
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && oldPageController.hasClients && oldPageController != _pageController ) {
           oldPageController.dispose();
@@ -127,7 +116,6 @@ class _StoryCarouselState extends State<StoryCarousel> {
         }
       });
 
-      // Ensure UI uses the correct fraction, especially for baseCardWidth calculation in build
       setState(() {});
     }
      print("didChangeDependencies completed.");
@@ -139,44 +127,75 @@ class _StoryCarouselState extends State<StoryCarousel> {
     super.dispose();
   }
 
+  // --- Handler for TAPPING a card ---
   Future<void> _onCardTap(int index) async {
-     // ... (No changes needed in _onCardTap) ...
-      if (_isLoading || _hasError) {
-       print("StoryCarousel: Cannot handle tap, repository not ready or error occurred.");
-       return;
-     }
+    if (_isLoading || _hasError) {
+      print("StoryCarousel: Cannot handle tap, repository not ready.");
+      return;
+    }
+    print('Card tapped at index: $index');
 
-     print('Card tapped at index: $index');
-     try {
-       final CardInfo? existingCard = _savedCards.firstWhereOrNull(
-         (card) => card.positionIndex == index
-       );
+    final CardInfo? existingCard = _savedCards.firstWhereOrNull(
+      (card) => card.positionIndex == index
+    );
 
-       if (existingCard != null) {
-         print('Card data already exists for index $index!');
-         print('Existing Card Info: $existingCard');
-         // TODO: Navigate to the timeline screen, passing existingCard.uniqueId
-       } else {
-         print('No card data found for index $index. Showing create dialog...');
-         final result = await showCreateStoryDialog(context, index);
+    if (existingCard != null) {
+      // --- TAP on EXISTING card ---
+      print('Existing card tapped. Navigating to timeline (TODO)...');
+      print('Existing Card Info: $existingCard');
+      // TODO: Navigate to the timeline screen, passing existingCard.uniqueId
+    } else {
+      // --- TAP on EMPTY card ---
+      print('Empty card tapped. Showing create dialog...');
+      // Call dialog in CREATE mode (no existingCard passed)
+      final result = await showCreateStoryDialog(context, index); // No existingCard
 
-         if (result == true) {
-           print('Create dialog confirmed successful save.');
-           if (!mounted) return;
-           print("StoryCarousel: Reloading data after save...");
-           await _loadInitialCardData();
-           if (mounted) {
-             setState(() {});
-             print("StoryCarousel: Data reloaded, UI should update.");
-           }
-         } else {
-           print('Create dialog cancelled or save failed.');
-         }
-       }
-     } catch (e, stackTrace) {
-       print('Error handling card tap for index $index: $e\n$stackTrace');
-     }
+      if (result == true) {
+        print('Create dialog successful.');
+        if (!mounted) return;
+        print("Reloading data...");
+        await _loadInitialCardData();
+        if (mounted) {
+          setState(() {});
+          print("Data reloaded.");
+        }
+      } else {
+        print('Create dialog cancelled or failed.');
+      }
+    }
   }
+
+  // --- NEW: Handler for LONG PRESSING a card ---
+  Future<void> _onCardLongPress(CardInfo cardToEdit) async {
+      if (_isLoading || _hasError) {
+        print("StoryCarousel: Cannot handle long press, repository not ready.");
+        return;
+      }
+      print('Card long pressed at index: ${cardToEdit.positionIndex}. Showing edit dialog...');
+      print('Card to Edit Info: $cardToEdit');
+
+      // Call dialog in EDIT mode, passing the existing card
+      final result = await showCreateStoryDialog(
+        context,
+        cardToEdit.positionIndex, // Pass index just in case dialog needs it
+        existingCard: cardToEdit,  // <-- Pass the card data for editing
+      );
+
+      if (result == true) {
+        print('Edit dialog successful.');
+        if (!mounted) return;
+        print("Reloading data after edit...");
+        await _loadInitialCardData(); // Reload data to reflect changes
+        if (mounted) {
+          setState(() {}); // Rebuild UI
+          print("Data reloaded.");
+        }
+      } else {
+        print('Edit dialog cancelled or failed.');
+      }
+    }
+  // --- End NEW Handler ---
+
 
   @override
   Widget build(BuildContext context) {
@@ -187,10 +206,8 @@ class _StoryCarouselState extends State<StoryCarousel> {
           return const Center(child: CircularProgressIndicator());
         } else if (_hasError || snapshot.hasError) {
           print("FutureBuilder Error: ${snapshot.error}");
-          // Simplified error display for brevity
           return const Center(child: Text('Error loading data', style: TextStyle(color: Colors.red)));
         } else {
-          // Main Carousel build
           return SizedBox(
             height: 290.0,
             child: ScrollConfiguration(
@@ -198,24 +215,22 @@ class _StoryCarouselState extends State<StoryCarousel> {
                 dragDevices: { PointerDeviceKind.touch, PointerDeviceKind.mouse },
               ),
               child: PageView.builder(
-                controller: _pageController, // Use the potentially updated controller
+                controller: _pageController,
                 itemCount: _stories.length,
                 itemBuilder: (context, index) {
                   final CardInfo? cardInfo = _savedCards.firstWhereOrNull(
                     (card) => card.positionIndex == index
                   );
                   final String imagePathToShow = cardInfo?.imagePath ?? _defaultImagePath;
-
-                  // Use MediaQuery HERE (safe within build) to get width
                   double availableWidth = MediaQuery.of(context).size.width * _currentViewportFraction;
-                  // Adjust multiplier to control how much of the viewport the base card takes
-                  double baseCardWidth = availableWidth * 0.85; // Example: 85% of viewport item width
+                  double baseCardWidth = availableWidth * 0.85;
 
+                  // Pass all necessary info down, including cardInfo for long press check
                   return _buildStoryItemContent(
                     imagePathToShow,
                     index,
-                    cardInfo,
-                    baseCardWidth, // Pass calculated base width
+                    cardInfo, // Pass the potential card info
+                    baseCardWidth,
                   );
                 },
               ),
@@ -226,79 +241,109 @@ class _StoryCarouselState extends State<StoryCarousel> {
     );
   }
 
-  // --- _buildStoryItemContent method (with conditional image loading) remains the same ---
+
+   // --- CORRECTED _buildStoryItemContent method ---
   Widget _buildStoryItemContent(String imagePath, int index, CardInfo? cardInfo, double baseCardWidth) {
-      final bool isAsset = !imagePath.startsWith('/');
-      Widget errorFallbackWidget = Container( /* ... */ ); // Keep fallback
-      Widget imageWidget;
+    final bool isAsset = !imagePath.startsWith('/'); // Basic check for asset vs file path
+    Widget errorFallbackWidget = Container(
+        color: Colors.grey[300],
+        child: Center(child: Icon(Icons.broken_image, color: Colors.grey[600]))
+    );
 
-      if (isAsset) {
-        imageWidget = Image.asset(
-           imagePath,
-           fit: BoxFit.cover,
-           errorBuilder: (context, error, stackTrace) {
-             print("Error loading asset image: $imagePath, Error: $error");
-             if (imagePath != _defaultImagePath) {
-               return Image.asset(_defaultImagePath, fit: BoxFit.cover, errorBuilder: (ctx, err, st) => errorFallbackWidget);
-             } else { return errorFallbackWidget; }
-           },
-         );
-      } else {
-         File imageFile = File(imagePath);
-         imageWidget = Image.file(
-           imageFile,
-           fit: BoxFit.cover,
-           errorBuilder: (context, error, stackTrace) {
-             print("Error loading file image: $imagePath, Error: $error");
-             return Image.asset(_defaultImagePath, fit: BoxFit.cover, errorBuilder: (ctx, err, st) => errorFallbackWidget);
-           },
-         );
-      }
+    // Define the actual image widget conditionally
+    Widget imageWidget;
+    if (isAsset) {
+      // Use Image.asset for asset paths
+      imageWidget = Image.asset( // <-- Was previously /* ... */
+        imagePath, // Pass the asset path string
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print("Error loading asset image: $imagePath, Error: $error");
+          // Fallback to default asset *if* the failed asset wasn't already the default
+          if (imagePath != _defaultImagePath) {
+            return Image.asset(
+              _defaultImagePath,
+              fit: BoxFit.cover,
+              errorBuilder: (ctx, err, st) {
+                 print("Error loading fallback asset image: $_defaultImagePath, Error: $err");
+                 return errorFallbackWidget; // Final fallback
+              },
+            );
+          } else {
+             return errorFallbackWidget; // Already failed on default
+          }
+        },
+      );
+    } else {
+      // Use Image.file for file paths
+      File imageFile = File(imagePath);
+      imageWidget = Image.file( // <-- Was previously /* ... */
+        imageFile, // Pass the File object
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print("Error loading file image: $imagePath, Error: $error");
+          // Fallback to default ASSET image if file loading fails
+          return Image.asset(
+             _defaultImagePath,
+             fit: BoxFit.cover,
+             errorBuilder: (ctx, err, st) {
+                print("Error loading fallback asset image: $_defaultImagePath, Error: $err");
+                return errorFallbackWidget; // Final fallback
+             },
+           );
+        },
+      );
+    }
 
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedBuilder(
-            animation: _pageController,
-            builder: (context, child) {
-              double value = 0.0;
-              double cardHeight = 250.0; // Base height
-              double animatedCardWidth = baseCardWidth; // Base width for calculation
+    // --- Build the Column structure ---
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedBuilder(
+          animation: _pageController,
+          builder: (context, child) {
+             // ... (Animation logic remains the same) ...
+               double value = 0.0;
+               double cardHeight = 250.0;
+               double animatedCardWidth = baseCardWidth;
 
-              if (_pageController.hasClients && _pageController.position.hasContentDimensions && _pageController.page != null) {
-                 value = index - _pageController.page!;
-                 value = (1 - (value.abs() * 0.3)).clamp(0.8, 1.0);
-                 animatedCardWidth = Curves.easeOut.transform(value) * baseCardWidth;
-                 cardHeight = Curves.easeOut.transform(value) * cardHeight; // Apply scaling
-              } else {
-                 value = (index == _pageController.initialPage) ? 1.0 : 0.8;
-                 animatedCardWidth = Curves.easeOut.transform(value) * baseCardWidth;
-                 cardHeight = Curves.easeOut.transform(value) * cardHeight; // Apply scaling
-              }
+               if (_pageController.hasClients && _pageController.position.hasContentDimensions && _pageController.page != null) {
+                  value = index - _pageController.page!;
+                  value = (1 - (value.abs() * 0.3)).clamp(0.8, 1.0);
+                  animatedCardWidth = Curves.easeOut.transform(value) * baseCardWidth;
+                  cardHeight = Curves.easeOut.transform(value) * cardHeight;
+               } else {
+                  value = (index == _pageController.initialPage) ? 1.0 : 0.8;
+                  animatedCardWidth = Curves.easeOut.transform(value) * baseCardWidth;
+                  cardHeight = Curves.easeOut.transform(value) * cardHeight;
+               }
 
-              return Center(
-                child: SizedBox(
-                  height: cardHeight,
-                  width: animatedCardWidth,
-                  child: GestureDetector(
-                    onTap: () => _onCardTap(index),
-                    child: child,
-                  ),
+            return Center(
+              child: SizedBox(
+                height: cardHeight,
+                width: animatedCardWidth,
+                child: GestureDetector(
+                  onTap: () => _onCardTap(index),
+                  // Only enable long press if cardInfo exists
+                  onLongPress: cardInfo != null ? () => _onCardLongPress(cardInfo) : null,
+                  child: child,
                 ),
-              );
-            },
-            child: Card(
-              margin: EdgeInsets.symmetric(horizontal: kIsWeb ? 8.0 : 10.0, vertical: 10.0),
-              elevation: 4.0,
-              clipBehavior: Clip.antiAlias,
-              child: imageWidget, // Use the conditional image widget
-            ),
+              ),
+            );
+          },
+          child: Card(
+            margin: EdgeInsets.symmetric(horizontal: kIsWeb ? 8.0 : 10.0, vertical: 10.0),
+            elevation: 4.0,
+            clipBehavior: Clip.antiAlias,
+            // --- Use the correctly created imageWidget ---
+            child: imageWidget,
           ),
-          // --- Conditional Indicator Box (remains the same) ---
-          if (cardInfo != null && cardInfo.surname.isNotEmpty) ...[
-             const SizedBox(height: 4),
+        ),
+        // --- Conditional Indicator Box (remains the same) ---
+        if (cardInfo != null && cardInfo.surname.isNotEmpty) ...[
+            const SizedBox(height: 4),
              Container(
-               width: baseCardWidth * 0.9, // Use baseCardWidth for consistency
+               width: baseCardWidth * 0.9,
                height: 20,
                padding: const EdgeInsets.symmetric(horizontal: 4.0),
                decoration: BoxDecoration(
@@ -316,7 +361,18 @@ class _StoryCarouselState extends State<StoryCarousel> {
            ] else ...[
              const SizedBox(height: 24),
            ],
-        ],
-      );
-    }
+      ],
+    );
+  }
+  // --- End CORRECTED _buildStoryItemContent method ---
 }
+
+// Helper extension for safety (if not already defined elsewhere)
+// extension IterableExtensions<E> on Iterable<E> {
+//   E? firstWhereOrNull(bool Function(E element) test) {
+//     for (E element in this) {
+//       if (test(element)) return element;
+//     }
+//     return null;
+//   }
+// }

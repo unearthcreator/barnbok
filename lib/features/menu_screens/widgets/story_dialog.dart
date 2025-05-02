@@ -1,10 +1,9 @@
-import 'dart:io'; // Still needed for File type in state and callback
+import 'dart:io';
 import 'package:flutter/material.dart';
-// import 'package:image_picker/image_picker.dart'; // No longer needed here
 import 'package:uuid/uuid.dart';
 import 'package:hive/hive.dart';
 
-// Import the new widget
+// Import the selector widget
 import 'package:barnbok/features/menu_screens/profile_image_selector.dart';
 
 // Adjust paths as needed
@@ -13,22 +12,37 @@ import 'package:barnbok/repositories/card_data_repository.dart';
 import 'package:barnbok/repositories/hive_card_data_repository.dart';
 
 
-// --- showCreateStoryDialog function (no changes) ---
-Future<bool?> showCreateStoryDialog(BuildContext context, int positionIndex) async {
+// --- MODIFIED showCreateStoryDialog function ---
+Future<bool?> showCreateStoryDialog(
+  BuildContext context,
+  int positionIndex, { // positionIndex still relevant for new cards
+  CardInfo? existingCard, // Optional: Pass card data if editing
+}) async {
   final result = await showDialog<bool?>(
     context: context,
     barrierDismissible: false,
     builder: (BuildContext dialogContext) {
-      return _CreateStoryDialogContent(positionIndex: positionIndex);
+      // Pass both index and optional existing card data
+      return _CreateStoryDialogContent(
+        positionIndex: positionIndex,
+        existingCard: existingCard, // Pass it down
+      );
     },
   );
   return result;
 }
 
 
+// --- MODIFIED StatefulWidget ---
 class _CreateStoryDialogContent extends StatefulWidget {
   final int positionIndex;
-  const _CreateStoryDialogContent({required this.positionIndex, super.key});
+  final CardInfo? existingCard; // Added optional existing card data
+
+  const _CreateStoryDialogContent({
+    required this.positionIndex,
+    this.existingCard, // Added to constructor
+    super.key,
+  });
 
   @override
   State<_CreateStoryDialogContent> createState() => _CreateStoryDialogContentState();
@@ -42,26 +56,29 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
   late final CardDataRepository _repository;
   bool _repoInitialized = false;
 
-  // --- REMOVED image picker state/logic ---
-  // File? _selectedImageFile;         // REMOVED
-  // final ImagePicker _picker = ImagePicker(); // REMOVED
-
-  // --- ADDED state variable to hold the file passed back from the selector ---
+  // State variable to hold the file selected by ProfileImageSelector *during this session*
   File? _finalSelectedImageFile;
 
-  // Keep placeholder path accessible for submitForm default
+  // Placeholder path - still needed for default when creating
   static const String fakeImagePath = 'assets/images/baby_foot_ceramic.jpg';
+
+  // Helper getter to easily check if we are editing
+  bool get isEditing => widget.existingCard != null;
 
   @override
   void initState() {
     super.initState();
-    _surnameController = TextEditingController();
-    _lastNameController = TextEditingController();
+
+    // Initialize controllers - pre-fill if editing
+    _surnameController = TextEditingController(text: widget.existingCard?.surname ?? '');
+    _lastNameController = TextEditingController(text: widget.existingCard?.lastName ?? '');
+    // Note: Initial image is handled by passing initialImagePath to ProfileImageSelector
+
     _initializeRepository();
   }
 
   Future<void> _initializeRepository() async {
-    // ... (repository initialization logic - no changes)
+    // ... (no changes needed here) ...
      try {
       if (!Hive.isBoxOpen(HiveCardDataRepository.boxName)) {
         print("CreateStoryDialog: Warning - Box was not open.");
@@ -88,9 +105,8 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
     super.dispose();
   }
 
-  // --- REMOVED _pickImage method ---
-  // Future<void> _pickImage() async { ... } // REMOVED
 
+  // --- MODIFIED submit form ---
   Future<void> _submitForm() async {
     if (!_repoInitialized || _isSaving) return;
 
@@ -98,41 +114,50 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
       setState(() { _isSaving = true; });
 
       try {
+        // --- Determine details based on mode (Create vs Edit) ---
         final String surname = _surnameController.text.trim();
         final String lastName = _lastNameController.text.trim();
-        final String uniqueId = const Uuid().v4();
 
-        String imagePathToSave = fakeImagePath; // Use the constant defined here
-        // --- UPDATED to use the state variable holding the callback result ---
+        // Use existing ID if editing, otherwise generate a new one
+        final String uniqueId = widget.existingCard?.uniqueId ?? const Uuid().v4();
+
+        // Use existing positionIndex if editing, otherwise use the one passed for new card
+        final int positionIndex = widget.existingCard?.positionIndex ?? widget.positionIndex;
+
+        // Determine image path: Start with existing or default, override only if a NEW file was selected
+        String imagePathToSave = widget.existingCard?.imagePath ?? fakeImagePath;
         if (_finalSelectedImageFile != null) {
+          // A new image was selected during this session, use its path
           imagePathToSave = _finalSelectedImageFile!.path;
         }
-        // --- End determining image path ---
+        // --- End determining details ---
 
-        final newCardData = CardInfo(
+        // Create the CardInfo object with determined details
+        final cardDataToSave = CardInfo(
           uniqueId: uniqueId,
           surname: surname,
-          lastName: lastName.isEmpty ? null : lastName,
+          lastName: lastName.isEmpty ? null : lastName, // Store null if empty
           imagePath: imagePathToSave,
-          positionIndex: widget.positionIndex,
+          positionIndex: positionIndex,
+          // Optional: Handle other fields like serverId if necessary for updates
+          // serverId: widget.existingCard?.serverId,
         );
 
-        print('CreateStoryDialog: Attempting to save...');
-        await _repository.saveCardInfo(newCardData);
+        print('CreateStoryDialog: Attempting to save (${isEditing ? "Edit" : "Create"})...');
+        // Assuming repository handles create vs update based on uniqueId/key
+        await _repository.saveCardInfo(cardDataToSave);
 
-        print('--- SAVE SUCCESS ---');
-        // ... (rest of print statements - no changes)
+        print('--- SAVE SUCCESS (${isEditing ? "Edit" : "Create"}) ---');
         print('Saved Card Info:');
-        print('  UUID: ${newCardData.uniqueId}');
-        print('  Surname: ${newCardData.surname}');
-        print('  Last Name: ${newCardData.lastName ?? 'N/A'}');
-        print('  Image Path: ${newCardData.imagePath}');
-        print('  Position Index: ${newCardData.positionIndex}');
+        print('  UUID: ${cardDataToSave.uniqueId}');
+        print('  Surname: ${cardDataToSave.surname}');
+        print('  Last Name: ${cardDataToSave.lastName ?? 'N/A'}');
+        print('  Image Path: ${cardDataToSave.imagePath}');
+        print('  Position Index: ${cardDataToSave.positionIndex}');
         print('--------------------');
 
-
         if (mounted) {
-          Navigator.of(context).pop(true);
+          Navigator.of(context).pop(true); // Return true on success
         }
 
       } catch (e, stackTrace) {
@@ -140,21 +165,25 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
         if (mounted) {
           setState(() { _isSaving = false; });
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Kunde inte spara berättelsen.'))
+              SnackBar(content: Text('Kunde inte ${isEditing ? "spara ändringar" : "skapa berättelsen"}.')) // Adjust msg
             );
         }
       }
     }
   }
+  // --- End submit form ---
 
+  // --- MODIFIED build method ---
   @override
   Widget build(BuildContext context) {
-    // --- REMOVED imagePlaceholder definition ---
-    // Widget imagePlaceholder = Container(...); // REMOVED
-
     return AlertDialog(
+      // --- Added Dialog Title ---
+      title: Text(
+        isEditing ? 'Redigera berättelse' : 'Skapa ny berättelse',
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500), // Optional styling
+      ),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-      contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 10.0),
+      contentPadding: const EdgeInsets.fromLTRB(24.0, 12.0, 24.0, 10.0), // Adjusted top padding slightly for title
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -162,8 +191,7 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-
-              // --- First Name (No changes) ---
+              // --- First Name Field (controller pre-filled in initState) ---
               Padding(
                 padding: const EdgeInsets.only(bottom: 4.0),
                 child: Text('Förnamn', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700])),
@@ -171,7 +199,6 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
               TextFormField(
                  controller: _surnameController,
                  enabled: !_isSaving,
-                 // ... (rest of TextFormField - no changes)
                  decoration: InputDecoration(
                     hintText: '(Obligatoriskt)',
                     hintStyle: TextStyle(color: Colors.grey[400]),
@@ -189,15 +216,14 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
               ),
               const SizedBox(height: 16),
 
-              // --- Last Name (No changes) ---
-               Padding(
+              // --- Last Name Field (controller pre-filled in initState) ---
+              Padding(
                  padding: const EdgeInsets.only(bottom: 4.0),
                  child: Text('Efternamn (valfritt)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700])),
                ),
               TextFormField(
                 controller: _lastNameController,
                 enabled: !_isSaving,
-                // ... (rest of TextFormField - no changes)
                  decoration: InputDecoration(
                     hintText: '(valfritt)',
                     hintStyle: TextStyle(color: Colors.grey[400]),
@@ -209,7 +235,6 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
               ),
               const SizedBox(height: 20),
 
-
               // --- Image Picker Section ---
               Text(
                   'Profilbild (valfritt)',
@@ -217,12 +242,15 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
               ),
               const SizedBox(height: 8),
 
-              // --- REPLACED Row with the new ProfileImageSelector widget ---
+              // --- ProfileImageSelector with initial path if editing ---
               ProfileImageSelector(
-                placeholderImagePath: fakeImagePath, // Pass the placeholder path
-                isDisabled: _isSaving, // Pass the disabled state
+                // Pass existing path if editing, otherwise null
+                initialImagePath: widget.existingCard?.imagePath,
+                // Still need placeholder for default display within selector
+                placeholderImagePath: fakeImagePath,
+                isDisabled: _isSaving,
                 onImageSelected: (File? selectedImage) {
-                  // Update the dialog's state variable when the selector provides a file
+                  // Update the dialog's state variable to track NEW selection
                   setState(() {
                     _finalSelectedImageFile = selectedImage;
                   });
@@ -230,14 +258,12 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
                 },
               ),
               // --- End Image Picker Section ---
-
             ],
           ),
         ),
       ),
       actionsPadding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 8.0),
       actions: <Widget>[
-        // ... (Actions - no changes) ...
         if (!_isSaving)
           TextButton(
             child: const Text('Avbryt'),
@@ -249,7 +275,8 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
           onPressed: (_isSaving || !_repoInitialized) ? null : _submitForm,
           child: _isSaving
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Skapa min berättelse'),
+              // --- Conditional Button Text ---
+              : Text(isEditing ? 'Spara' : 'Skapa min berättelse'),
         ),
       ],
     );
