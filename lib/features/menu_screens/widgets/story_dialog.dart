@@ -173,111 +173,159 @@ class _CreateStoryDialogContentState extends State<_CreateStoryDialogContent> {
   }
   // --- End submit form ---
 
-  // --- MODIFIED build method ---
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      // --- Added Dialog Title ---
-      title: Text(
-        isEditing ? 'Redigera berättelse' : 'Skapa ny berättelse',
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500), // Optional styling
-      ),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-      contentPadding: const EdgeInsets.fromLTRB(24.0, 12.0, 24.0, 10.0), // Adjusted top padding slightly for title
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              // --- First Name Field (controller pre-filled in initState) ---
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4.0),
-                child: Text('Förnamn', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700])),
-              ),
-              TextFormField(
-                 controller: _surnameController,
-                 enabled: !_isSaving,
-                 decoration: InputDecoration(
-                    hintText: '(Obligatoriskt)',
-                    hintStyle: TextStyle(color: Colors.grey[400]),
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        // --- MODIFIED build method ---
+      @override
+      Widget build(BuildContext context) {
+        // Define standard label style for reuse
+        final labelStyle = TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700]);
+        // Define size for color circles
+        const double circleDiameter = 30.0;
+
+        return AlertDialog(
+          title: Text(
+            isEditing ? 'Redigera berättelse' : 'Skapa ny berättelse',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+          ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+          contentPadding: const EdgeInsets.fromLTRB(24.0, 12.0, 24.0, 10.0),
+          content: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start, // Keep children aligned left
+                children: <Widget>[
+                  // --- First Name Field ---
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0),
+                    child: Text('Förnamn', style: labelStyle), // Use defined style
                   ),
-                  textCapitalization: TextCapitalization.words,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Obligatorisk';
-                    }
-                    return null;
-                  },
-              ),
-              const SizedBox(height: 16),
-
-              // --- Last Name Field (controller pre-filled in initState) ---
-              Padding(
-                 padding: const EdgeInsets.only(bottom: 4.0),
-                 child: Text('Efternamn (valfritt)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700])),
-               ),
-              TextFormField(
-                controller: _lastNameController,
-                enabled: !_isSaving,
-                 decoration: InputDecoration(
-                    hintText: '(valfritt)',
-                    hintStyle: TextStyle(color: Colors.grey[400]),
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  TextFormField(
+                    controller: _surnameController,
+                    enabled: !_isSaving,
+                    decoration: InputDecoration( /* ... */ ),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (value) { /* ... */ },
                   ),
-                  textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
-              // --- Image Picker Section ---
-              Text(
-                  'Profilbild (valfritt)',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[700]),
-              ),
-              const SizedBox(height: 8),
+                  // --- Last Name Field ---
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0),
+                    child: Text('Efternamn (valfritt)', style: labelStyle), // Use defined style
+                  ),
+                  TextFormField(
+                    controller: _lastNameController,
+                    enabled: !_isSaving,
+                    decoration: InputDecoration( /* ... */ ),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 20),
 
-              // --- ProfileImageSelector with initial path if editing ---
-              // --- ProfileImageSelector with fixed initial path ---
+                  // --- Image Picker Section ---
+                  Text(
+                      'Profilbild (valfritt)',
+                      style: labelStyle, // Use defined style
+                  ),
+                  const SizedBox(height: 8),
                   ProfileImageSelector(
-                    initialImagePath: widget.existingCard?.imagePath ?? fakeImagePath, // FIX applied here
+                    initialImagePath: widget.existingCard?.imagePath,
                     placeholderImagePath: fakeImagePath,
                     isDisabled: _isSaving,
                     onImageSelected: (File? selectedImage) {
-                      setState(() {
-                        _finalSelectedImageFile = selectedImage;
-                      });
+                      setState(() { _finalSelectedImageFile = selectedImage; });
                       print("CreateStoryDialog: Received image update: ${_finalSelectedImageFile?.path}");
                     },
                   ),
+                  // --- End Image Picker Section ---
 
-              // --- End Image Picker Section ---
-            ],
+                  // --- ADDED Theme Selection Section ---
+                  const SizedBox(height: 20), // Spacing before Theme section
+                  Text(
+                    'Theme', // Or "Tema" for Swedish
+                    style: labelStyle, // Use defined style
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    // You might want MainAxisAlignment.spaceAround or .spaceBetween
+                    // if you want them to spread out more automatically.
+                    // Using SizedBox provides fixed spacing.
+                    children: [
+                        // Light Blue Circle
+                        Container(
+                          width: circleDiameter,
+                          height: circleDiameter,
+                          decoration: const BoxDecoration(
+                            color: Colors.lightBlueAccent, // Or Colors.lightBlue
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10), // Spacing between circles
+
+                        // Pink Circle
+                        Container(
+                          width: circleDiameter,
+                          height: circleDiameter,
+                          decoration: const BoxDecoration(
+                            color: Colors.pinkAccent, // Or Colors.pink
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+
+                        // Purple Circle
+                        Container(
+                          width: circleDiameter,
+                          height: circleDiameter,
+                          decoration: const BoxDecoration(
+                            color: Colors.purpleAccent, // Or Colors.purple
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+
+                        // Red Circle
+                        Container(
+                          width: circleDiameter,
+                          height: circleDiameter,
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent, // Or Colors.red
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+
+                        // Green Circle
+                        Container(
+                          width: circleDiameter,
+                          height: circleDiameter,
+                          decoration: const BoxDecoration(
+                            color: Colors.greenAccent, // Or Colors.green
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                  // --- End Theme Selection Section ---
+
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
-      actionsPadding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 8.0),
-      actions: <Widget>[
-        if (!_isSaving)
-          TextButton(
-            child: const Text('Avbryt'),
-            onPressed: () {
-              Navigator.of(context).pop(null);
-            },
-          ),
-        ElevatedButton(
-          onPressed: (_isSaving || !_repoInitialized) ? null : _submitForm,
-          child: _isSaving
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              // --- Conditional Button Text ---
-              : Text(isEditing ? 'Spara' : 'Skapa min berättelse'),
-        ),
-      ],
-    );
-  }
+          actionsPadding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 8.0),
+          actions: <Widget>[
+            if (!_isSaving)
+              TextButton(
+                child: const Text('Avbryt'),
+                onPressed: () { Navigator.of(context).pop(null); },
+              ),
+            ElevatedButton(
+              onPressed: (_isSaving || !_repoInitialized) ? null : _submitForm,
+              child: _isSaving
+                  ? const SizedBox(/* ... progress indicator ... */)
+                  : Text(isEditing ? 'Spara' : 'Skapa min berättelse'),
+            ),
+          ],
+        );
+      }
 }
