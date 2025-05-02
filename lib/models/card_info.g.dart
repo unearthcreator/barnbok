@@ -19,7 +19,7 @@ class CardInfoAdapter extends TypeAdapter<CardInfo> {
     return CardInfo(
       uniqueId: fields[0] as String,
       surname: fields[1] as String,
-      lastName: fields[2] as String,
+      lastName: fields[2] as String?,
       imagePath: fields[3] as String,
       positionIndex: fields[4] as int,
       serverId: fields[5] as String?,
